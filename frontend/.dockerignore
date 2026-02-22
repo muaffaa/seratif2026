@@ -1,0 +1,14 @@
+.env.local
+.env.*.local
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+dist/
+build/
+.git
+.gitignore
+coverage/
+__pycache__/
+*.pyc
+.pytest_cache/

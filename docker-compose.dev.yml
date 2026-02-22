@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: seratif_db_dev
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: seratif2026
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: seratif_user
+      MYSQL_PASSWORD: seratif_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data_dev:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    networks:
+      - seratif_dev
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: seratif_backend_dev
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_NAME: seratif2026
+      DB_USER: seratif_user
+      DB_PASS: seratif_pass
+      APP_ENV: development
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/uploads:/var/www/html/uploads
+    networks:
+      - seratif_dev
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: seratif_frontend_dev
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - seratif_dev
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: seratif_pma_dev
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_USER: seratif_user
+      PMA_PASSWORD: seratif_pass
+    ports:
+      - "8080:80"
+    networks:
+      - seratif_dev
+
+volumes:
+  db_data_dev:
+
+networks:
+  seratif_dev:
+    driver: bridge

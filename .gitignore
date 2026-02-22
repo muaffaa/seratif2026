@@ -1,0 +1,75 @@
+# .gitignore - Updated for Railway deployment
+
+# Environment files (don't commit!)
+.env
+.env.local
+.env.production
+.env.railway
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# PHP
+vendor/
+composer.lock
+.phpunit.result.cache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (but keep directory structure)
+uploads/payments/*
+!uploads/payments/.gitkeep
+uploads/temp/*
+!uploads/temp/.gitkeep
+
+# Cache
+cache/*
+!cache/.gitkeep
+
+# Backup
+*.backup
+*.bak
+
+# Railway specific
+.railway/
+railway-build.log
+railway-deploy.log
+
+# Sensitive data
+*.pem
+*.key
+*.crt
+secret.*
+config/secrets.php
+
+# Generated files
+*.map
+*.min.js
+*.min.css
