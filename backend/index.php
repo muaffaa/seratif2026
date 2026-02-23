@@ -9,12 +9,26 @@ error_reporting(E_ALL);
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Determine allowed origin
+$allowed_origins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://localhost:8080',
+    getenv('APP_URL') ?: 'https://seratif2026-production.up.railway.app',
+];
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowed_origin = in_array($origin, $allowed_origins, true) ? $origin : $allowed_origins[4];
+
+// CORS headers
+header('Access-Control-Allow-Origin: ' . $allowed_origin);
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+
 // CORS preflight
 if ($method === 'OPTIONS') {
-    header('Access-Control-Allow-Origin: http://localhost:5173');
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Headers: Content-Type');
-    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     http_response_code(204);
     exit;
 }
@@ -35,7 +49,7 @@ if ($method === 'GET' && preg_match('#^/uploads/payments/[a-f0-9\-\.]+\.(jpg|jpe
             'webp' => 'image/webp',
         ];
         header('Content-Type: ' . ($mime_types[$ext] ?? 'application/octet-stream'));
-        header('Access-Control-Allow-Origin: http://localhost:5173');
+        header('Access-Control-Allow-Origin: ' . $allowed_origin);
         header('Access-Control-Allow-Credentials: true');
         header('Cache-Control: max-age=86400');
         readfile($file_path);
