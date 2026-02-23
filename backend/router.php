@@ -25,6 +25,13 @@ $_ENV['DB_PASS'] = getenv('DB_PASS') ?: '';
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// Health check
+if ($uri === '/health') {
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'ok', 'db_host' => $_ENV['DB_HOST']]);
+    exit;
+}
+
 // API routes - load backend router
 if (preg_match('#^/(api|auth|ticket|validate|admin|upload-payment)#', $uri)) {
     $_SERVER['REQUEST_URI'] = $uri;
@@ -45,6 +52,6 @@ if (file_exists(__DIR__ . '/dist/index.html')) {
     require __DIR__ . '/dist/index.html';
 } else {
     http_response_code(404);
-    echo 'Application not found';
+    echo 'Frontend not found';
 }
 
