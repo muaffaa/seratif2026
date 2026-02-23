@@ -33,15 +33,28 @@ exec php -S 0.0.0.0:80 /app/router.php\n\
 # Create router for frontend
 RUN cat > /app/router.php << 'PHPEOF'
 <?php
+// Set environment variables
+putenv('DB_HOST=' . (getenv('DB_HOST') ?: 'localhost'));
+putenv('DB_NAME=' . (getenv('DB_NAME') ?: 'seratif2026'));
+putenv('DB_USER=' . (getenv('DB_USER') ?: 'root'));
+putenv('DB_PASS=' . (getenv('DB_PASS') ?: ''));
+
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // API routes - include backend directly
 if (preg_match('#^/(api|auth|ticket|validate|admin|upload-payment)#', $uri)) {
-    $_SERVER['REQUEST_URI'] = $uri;
-    $_SERVER['SCRIPT_FILENAME'] = '/app/backend/index.php';
-    chdir('/app/backend');
-    require '/app/backend/index.php';
-    return true;
+    try {
+        $_SERVER['REQUEST_URI'] = $uri;
+        $_SERVER['SCRIPT_FILENAME'] = '/app/backend/index.php';
+        chdir('/app/backend');
+        require '/app/backend/index.php';
+        return true;
+    } catch (Exception $e) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => $e->getMessage()]);
+        return true;
+    }
 }
 
 // Static files
@@ -52,7 +65,12 @@ if (is_file($file)) {
 
 // Serve index.html for SPA routes
 if (is_dir($file) || !file_exists($file)) {
-    require '/app/public_html/index.html';
+    if (file_exists('/app/public_html/index.html')) {
+        require '/app/public_html/index.html';
+        return true;
+    }
+    http_response_code(404);
+    echo 'Frontend dist not found';
     return true;
 }
 PHPEOF
