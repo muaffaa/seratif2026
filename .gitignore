@@ -14,3 +14,6 @@ uploads/payments/*
 backend/uploads/payments/*
 !backend/uploads/payments/.gitkeep
 frontend/.vscode/
+# Allow frontend dist in repo for deployment
+!frontend/dist/
+!frontend/dist/**
