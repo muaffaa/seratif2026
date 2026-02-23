@@ -6,62 +6,65 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Backend stage
-FROM php:8.2-apache
+# Backend stage - use PHP CLI with built-in server
+FROM php:8.2-cli
 WORKDIR /app
 
 # Install PHP extensions
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Fix MPM issue - disable all conflicting MPM modules
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load && \
-    a2enmod mpm_prefork
-
-# Enable mod_rewrite for pretty URLs
-RUN a2enmod rewrite
-
 # Copy frontend build output
-COPY --from=frontend-builder /app/frontend/dist /var/www/html/dist
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Copy backend
-COPY backend/ /var/www/html/
+COPY backend/ /app/backend/
 
-# Create Apache VirtualHost config
-RUN cat > /etc/apache2/sites-available/000-default.conf << 'EOF'
-<VirtualHost *:80>
-    DocumentRoot /var/www/html
-    
-    <Directory /var/www/html>
-        RewriteEngine On
-        # Don't rewrite if file or directory exists
-        RewriteCond %{REQUEST_FILENAME} -f [OR]
-        RewriteCond %{REQUEST_FILENAME} -d
-        RewriteRule ^ - [L]
-        # Route all requests to api/index.php for API calls
-        RewriteRule ^api/(.*)$ api/index.php [QSA,L]
-        # Route SPA requests to dist/index.html
-        RewriteRule ^(?!api/).*$ dist/index.html [QSA,L]
-    </Directory>
+# Create startup script
+RUN cat > /app/start.sh << 'BASHEOF'
+#!/bin/bash
+export DB_HOST=${DB_HOST:-localhost}
+export DB_NAME=${DB_NAME:-seratif2026}
+export DB_USER=${DB_USER:-root}
+export DB_PASS=${DB_PASS:-}
 
-    <Directory /var/www/html/dist>
-        RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^ index.html [QSA,L]
-    </Directory>
-</VirtualHost>
-EOF
+# Start PHP built-in server for backend
+cd /app/backend && php -S 0.0.0.0:8000 index.php &
 
-RUN a2ensite 000-default
+# Wait a moment
+sleep 1
+
+# Create simple router for frontend in current shell
+cd /app && php -r "
+\$root = '/app/frontend/dist';
+\$uri = parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH);
+\$file = \$root . \$uri;
+
+// If URI is /api or /auth, proxy to backend
+if (strpos(\$uri, '/api') === 0 || strpos(\$uri, '/auth') === 0 || strpos(\$uri, '/ticket') === 0 || strpos(\$uri, '/validate') === 0 || strpos(\$uri, '/admin') === 0 || strpos(\$uri, '/upload-payment') === 0) {
+    http_response_code(500);
+    die('Proxy to backend on :8000');
+}
+
+// If it's a file, serve it
+if (file_exists(\$file) && is_file(\$file)) {
+    return false;
+}
+
+// If it's a directory with index.html
+if (is_dir(\$file) && file_exists(\$file . '/index.html')) {
+    return false;
+}
+
+// Otherwise serve index.html (SPA)
+require \$root . '/index.html';
+" -S 0.0.0.0:80 2>&1 &
+
+wait
+BASHEOF
+RUN chmod +x /app/start.sh
 
 # Expose port
-EXPOSE 80
+EXPOSE 80 8000
 
-# Set environment variables
-ENV DB_HOST=${DB_HOST:-localhost}
-ENV DB_NAME=${DB_NAME:-seratif2026}
-ENV DB_USER=${DB_USER:-root}
-ENV DB_PASS=${DB_PASS:-}
-
-# Start Apache
-CMD ["apache2-foreground"]
+# Start servers
+CMD ["/app/start.sh"]
