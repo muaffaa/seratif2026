@@ -27,7 +27,7 @@ COPY backend/ /var/www/html/
 
 # Create Apache VirtualHost config
 RUN cat > /etc/apache2/sites-available/000-default.conf << 'EOF'
-<VirtualHost *:8080>
+<VirtualHost *:80>
     DocumentRoot /var/www/html
     
     <Directory /var/www/html>
@@ -51,16 +51,16 @@ RUN cat > /etc/apache2/sites-available/000-default.conf << 'EOF'
 </VirtualHost>
 EOF
 
+RUN a2ensite 000-default
 
 # Expose port
-EXPOSE 8080
+EXPOSE 80
 
 # Set environment variables
 ENV DB_HOST=${DB_HOST:-localhost}
 ENV DB_NAME=${DB_NAME:-seratif2026}
 ENV DB_USER=${DB_USER:-root}
 ENV DB_PASS=${DB_PASS:-}
-ENV PORT=8080
 
 # Start Apache
 CMD ["apache2-foreground"]
