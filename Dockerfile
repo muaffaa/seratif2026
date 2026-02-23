@@ -13,8 +13,9 @@ WORKDIR /app
 # Install PHP extensions
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Disable mpm_prefork and enable mpm_event
-RUN a2dismod mpm_prefork && a2enmod mpm_event
+# Fix MPM issue - disable all conflicting MPM modules
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load && \
+    a2enmod mpm_prefork
 
 # Enable mod_rewrite for pretty URLs
 RUN a2enmod rewrite
