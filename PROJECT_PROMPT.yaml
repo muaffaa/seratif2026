@@ -1,0 +1,486 @@
+project:
+  name: Seratif2026
+  title: SERATIF 2026 - Islamic Talkshow Event Management System
+  description: |
+    Complete event management platform for SERATIF 2026 (Inspirational Islamic Talkshow).
+    Includes user registration, payment management, ticket validation, PDF generation, 
+    and admin panel with QR code scanning capabilities.
+  version: "1.0.0"
+  status: Live
+  deployed_url: https://seratif2026-production.up.railway.app
+  github_repo: https://github.com/muaffaa/seratif2026
+  deployment_date: "2026-02-23"
+
+architecture:
+  type: Full Stack Web Application
+  deployment_platform: Railway
+  containerization: Docker (Alpine Linux)
+  
+  stack:
+    frontend:
+      framework: React 19
+      build_tool: Vite
+      router: React Router v7
+      styling: TailwindCSS
+      state_management: Context API (AuthContext)
+      language: JSX/JavaScript
+      
+    backend:
+      language: PHP 8.2
+      runtime: PHP CLI (built-in server)
+      package_manager: Composer
+      key_libraries:
+        - endroid/qr-code: QR code generation
+        - bacon/bacon-qr-code: Alternative QR codec
+        - tecnickcom/tcpdf: PDF generation
+      
+    database:
+      system: MySQL 8.0
+      charset: utf8mb4
+      collation: utf8mb4_unicode_ci
+      
+    infrastructure:
+      platform: Railway
+      container: PHP 8.2 CLI Alpine
+      ci_cd: Automatic (git push triggers deploy)
+      environment_config: Railway variables
+
+project_structure:
+  root:
+    - README.md
+    - Dockerfile
+    - .gitignore
+    - RAILWAY_SETUP.md
+    - DEPLOYMENT_SUMMARY.md
+    - setup-railway-env.sh
+    - import-railway-schema.sh
+    - start-backend.sh
+    - railway.json
+    
+  frontend:
+    description: React application with Vite
+    path: ./frontend/
+    key_files:
+      - package.json: Dependencies (React, React Router, Tailwind)
+      - index.html: Entry HTML
+      - vite.config.js: Vite configuration
+      - src/main.jsx: React entry point
+      - src/App.jsx: Main router and route definitions
+      - src/index.css: Global styles + Tailwind config
+    directories:
+      src/components:
+        - Navbar.jsx: Navigation bar with brand and auth links
+      src/context:
+        - AuthContext.jsx: Global authentication state management
+      src/pages:
+        - Landing.jsx: Homepage with event info
+        - Login.jsx: User login page
+        - Register.jsx: User registration form
+        - Dashboard.jsx: User dashboard (ticket status, payment proof)
+        - Validate.jsx: Public ticket validation page
+        - admin/:
+          - AdminLogin.jsx: Admin authentication
+          - AdminPanel.jsx: Admin dashboard for payment management
+          - AdminScan.jsx: QR code scanner for ticket validation
+          - ParticipantDetail.jsx: Detailed participant view
+    build:
+      command: npm run build
+      output: dist/
+      included_in_repo: "yes" (for Docker deployment)
+      
+  backend:
+    description: PHP API backend
+    path: ./backend/
+    key_files:
+      - index.php: Main router handling all API requests
+      - router.php: Docker router (bridges frontend & backend)
+      - config/database.php: MySQL PDO connection class
+      - utils/helpers.php: Utility functions
+    directories:
+      auth/:
+        - login.php: User login endpoint (POST /auth/login)
+        - logout.php: User logout endpoint (POST /auth/logout)
+        - register.php: User registration endpoint (POST /auth/register)
+      admin/:
+        - login.php: Admin authentication endpoint
+        - payments.php: Payment management (list, approve)
+      api/:
+        - ticket.php: GET /ticket/{uuid} - Generate PDF e-ticket
+        - user_status.php: GET /user/status - Check user session
+        - validate.php: GET /validate/{uuid} - Public ticket validation
+        - upload_payment.php: POST /upload-payment - Upload payment proof
+    environment_variables:
+      DB_HOST: Database hostname
+      DB_NAME: Database name (seratif2026)
+      DB_USER: MySQL username (root)
+      DB_PASS: MySQL password
+      APP_URL: Frontend URL for CORS
+      
+  database:
+    path: ./database/
+    key_files:
+      - schema.sql: Complete database schema
+    tables:
+      - users:
+          columns:
+            - id: INT AUTO_INCREMENT PRIMARY KEY
+            - uuid: VARCHAR(36) UNIQUE
+            - full_name: VARCHAR(150)
+            - email: VARCHAR(191) UNIQUE
+            - password_hash: VARCHAR(255) bcrypt
+            - phone_number: VARCHAR(20)
+            - address: TEXT
+            - school_origin: VARCHAR(200)
+            - created_at: TIMESTAMP
+      - payments:
+          columns:
+            - id: INT AUTO_INCREMENT PRIMARY KEY
+            - user_id: INT FOREIGN KEY (users.id)
+            - screenshot_path: VARCHAR(500)
+            - status: ENUM(pending, approved, rejected)
+            - created_at: TIMESTAMP
+            - approved_at: TIMESTAMP NULL
+            
+  uploads:
+    path: ./uploads/
+    directories:
+      - payments/: User payment proof screenshots
+      
+  vendor:
+    path: ./backend/vendor/
+    managed_by: Composer
+    key_packages:
+      - endroid/qr-code
+      - bacon/bacon-qr-code
+      - tecnickcom/tcpdf
+
+api_endpoints:
+  authentication:
+    - method: POST
+      path: /auth/register
+      description: Register new user
+      body:
+        - full_name: string
+        - email: string
+        - password: string
+        - phone_number: string
+        - address: string
+        - school_origin: string
+      response: { success: boolean, message: string, user: object }
+      
+    - method: POST
+      path: /auth/login
+      description: User login with email/password
+      body:
+        - email: string
+        - password: string
+      response: { success: boolean, message: string, user: object }
+      
+    - method: POST
+      path: /auth/logout
+      description: User logout
+      response: { success: boolean }
+      
+    - method: GET
+      path: /user/status
+      description: Check current user session status
+      response: { success: boolean, user: object|null }
+
+  payments:
+    - method: POST
+      path: /upload-payment
+      description: Upload payment proof screenshot
+      body:
+        - file: multipart/form-data
+      response: { success: boolean, message: string, path: string }
+      
+    - method: GET
+      path: /admin/payments
+      description: Get all payments (admin only)
+      response:
+        - success: boolean
+        - payments:
+          - id: integer
+          - user: object
+          - status: string
+          - screenshot_path: string
+          - created_at: timestamp
+      
+    - method: POST
+      path: /admin/approve
+      description: Approve or reject payment (admin only)
+      body:
+        - payment_id: integer
+        - action: enum(approve, reject)
+      response: { success: boolean, message: string }
+      
+    - method: POST
+      path: /admin/login
+      description: Admin authentication
+      body:
+        - username: string
+        - password: string
+      response: { success: boolean, message: string, admin: object }
+
+  tickets_validation:
+    - method: GET
+      path: /ticket/{uuid}
+      description: Generate and download PDF e-ticket
+      response: PDF file (application/pdf)
+      
+    - method: GET
+      path: /validate/{uuid}
+      description: Validate ticket (public, no auth required)
+      response:
+        - valid: boolean
+        - user: object
+        - status: string
+        - message: string
+
+  health:
+    - method: GET
+      path: /health
+      description: Application health check endpoint
+      response:
+        - status: string (ok)
+        - timestamp: datetime
+        - db_host: string
+        - app_version: string
+
+key_features:
+  user_features:
+    - User registration with validation
+    - Email-based login/logout
+    - Payment proof upload
+    - Dashboard showing ticket status
+    - Public ticket validation
+    - PDF e-ticket download
+    - Session management with cookies
+    
+  admin_features:
+    - Admin portal with authentication
+    - Payment review and management
+    - Approve/reject payment proofs
+    - Participant list view
+    - QR code scanning for entry
+    - Detailed participant information
+    - Payment status tracking
+    
+  technical_features:
+    - CORS headers for production
+    - Secure password hashing (bcrypt)
+    - Session-based authentication
+    - File upload handling
+    - QR code generation (dual library support)
+    - PDF ticket generation with TCPDF
+    - UUID-based ticket identification
+    - Error handling and validation
+    - Graceful error responses
+
+security_features:
+  - SQL injection prevention (prepared statements)
+  - Password hashing with bcrypt
+  - CORS headers configured
+  - Session cookies for auth
+  - UUID-based ticket identification
+  - Admin role separation
+  - File upload validation
+  - Input validation on forms
+
+development_workflow:
+  local_setup:
+    prerequisites:
+      - PHP 8.2+
+      - MySQL 8.0+
+      - Node.js 20+
+      - npm or yarn
+      - Git
+      
+    backend_start:
+      - "chmod +x ./start-backend.sh"
+      - "./start-backend.sh"
+      - "Runs on: http://localhost:8000"
+      
+    frontend_start:
+      - "cd frontend"
+      - "npm install"
+      - "npm run dev"
+      - "Runs on: http://localhost:5173"
+      
+    database:
+      - "mysql -u root -padmin123 < database/schema.sql"
+      - Database: seratif2026
+      - User: root
+      - Password: admin123 (local default)
+      
+    environment_setup:
+      - Backend uses: start-backend.sh (exports env vars)
+      - Frontend: .env.local (if needed)
+      - Docker: Railway environment variables
+      
+  build_process:
+    frontend_production:
+      - "cd frontend && npm run build"
+      - Output: dist/ folder
+      
+    docker_build:
+      - "Multi-stage build: Node (frontend) + PHP CLI (backend)"
+      - Final image: PHP 8.2 CLI Alpine + frontend dist
+      
+    deployment:
+      - Push to GitHub → Railway auto-deploys
+      - Docker image built and deployed
+      - No manual build needed
+
+deployment_instructions:
+  prerequisites:
+    - GitHub repository linked
+    - Railway account and project
+    - MySQL database in Railway
+    
+  environment_variables:
+    required:
+      - DB_HOST: mysql.railway.internal (Railway MySQL)
+      - DB_NAME: seratif2026
+      - DB_USER: root
+      - DB_PASS: (provided password)
+    
+  steps:
+    1_git_setup:
+      - Ensure code is on GitHub main branch
+      - Railway automatically pulls and deploys
+      
+    2_add_mysql:
+      - Railway Dashboard → Add Service → MySQL
+      - Note connection credentials
+      
+    3_set_environment:
+      - "Option A: ./setup-railway-env.sh script"
+      - "Option B: Manual Railway Dashboard Variables"
+      - Variables: DB_HOST, DB_NAME, DB_USER, DB_PASS
+      
+    4_import_schema:
+      - Run: "./import-railway-schema.sh"
+      - Or manual: "mysql -h host -u user -p pass db < database/schema.sql"
+      
+    5_verify:
+      - Health check: https://seratif2026-production.up.railway.app/health
+      - Homepage: https://seratif2026-production.up.railway.app/
+      
+  monitoring:
+    - "railway logs" - View deployment logs
+    - "railway variable list" - Check env variables
+    - "railway up" - Redeploy if needed
+
+testing_checklist:
+  frontend:
+    - "Landing page loads correctly"
+    - "Navigation works"
+    - "Registration form validates and submits"
+    - "Login/logout functionality"
+    - "Dashboard shows user info"
+    - "Admin pages accessible when logged in"
+    - "Responsive design on mobile"
+    
+  backend:
+    - "Health endpoint returns 200"
+    - "/auth/register creates user"
+    - "/auth/login authenticates user"
+    - "User sessions persist"
+    - "/user/status returns current user"
+    - "/upload-payment accepts file"
+    - "/ticket/{uuid} generates PDF"
+    - "/validate/{uuid} validates ticket"
+    - "Admin endpoints require authentication"
+    
+  database:
+    - "MySQL connection successful"
+    - "All tables created"
+    - "FOREIGN KEY constraints work"
+    - "UNIQUE constraints enforced"
+    - "Timestamps auto-update"
+    
+  integration:
+    - "Frontend to Backend communication works"
+    - "CORS headers prevent errors"
+    - "Authentication flows end-to-end"
+    - "File uploads stored correctly"
+    - "PDF generation works"
+    
+  deployment:
+    - "Docker image builds"
+    - "Container starts without errors"
+    - "Environment variables loaded"
+    - "Database connection established"
+    - "All routes accessible"
+
+troubleshooting:
+  "502 Bad Gateway Error":
+    cause: "Backend not responding or database not connected"
+    solutions:
+      - "Check MySQL is running in Railway"
+      - "Verify environment variables are set correctly"
+      - "Check railway logs for errors"
+      - "Run database schema import"
+      
+  "CORS Errors":
+    cause: "Frontend and backend domain mismatch"
+    solution: "Both run on same domain in production (railway)"
+    
+  "Database Connection Failed":
+    cause: "Wrong credentials or MySQL not available"
+    solutions:
+      - "Check DB_HOST, DB_USER, DB_PASS in Railway"
+      - "Verify seratif2026 database exists"
+      - "Run import-railway-schema.sh to create schema"
+      
+  "Frontend Not Loading":
+    cause: "dist/ folder not in container"
+    solution: "Ensure frontend/dist/ is included in Git"
+    
+  "PDF Generation Error":
+    cause: "TCPDF or temp directory issues"
+    solution: "Check PHP extensions: docker-php-ext-install"
+
+performance_notes:
+  - Frontend: React SPA with Vite (optimized bundles)
+  - Backend: PHP 8.2 with built-in server
+  - Database: MySQL indexed on UUID, email, user_id
+  - Deployment: Alpine Linux (small image size)
+  - CORS: Configured for production domain only
+
+maintenance_guidelines:
+  backup:
+    - Regular MySQL backups via Railway
+    - GitHub source code backup
+    
+  monitoring:
+    - Check railway logs regularly
+    - Monitor error rates
+    - Track payment approvals
+    
+  updates:
+    - Update PHP packages via Composer
+    - Update npm packages in frontend
+    - Test changes locally before pushing
+    
+  security:
+    - Keep credentials secure (Railway env vars)
+    - Regular password policy enforcement
+    - Validate all user inputs
+    - Monitor for suspicious activities
+
+documentation_files:
+  - README.md: Project overview and setup
+  - DEPLOYMENT_SUMMARY.md: Complete deployment info
+  - RAILWAY_SETUP.md: Railway-specific setup guide
+  - CODE_ANALYSIS.md: Detailed code analysis
+  - FIX_ACTION_PLAN.md: Issue resolution guide
+  - RAILWAY_SETUP.md: Environment and deployment
+
+contact_and_support:
+  github: https://github.com/muaffaa/seratif2026
+  deployed: https://seratif2026-production.up.railway.app
+  environment: MySQL database in Railway (root user provided credentials)
+  deployment_platform: Railway
+  containerization: Docker with Dockerfile multi-stage build
